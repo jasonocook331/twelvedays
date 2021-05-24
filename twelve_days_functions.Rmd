@@ -8,13 +8,14 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-
+knitr::opts_chunk$set(warning = FALSE, echo = TRUE)
 # Packages for Functions
 library(dplyr)
 library(glue)
 library(stringr)
 library(purrr)
+library(MAP)
+library(english)
 ```
 
 
@@ -24,7 +25,7 @@ Run the code below to load up a dataset called `xmas` that contains the crucial
 information about the gifts in the song. We will use this dataset to test out
 our functions as we work on them.
 
-```{r}
+```{r echo=TRUE, warning=FALSE}
 xmas <- read.csv("https://www.dropbox.com/s/e584pryn8evm1gz/xmas.csv?dl=1")
 ```
 
@@ -39,19 +40,24 @@ on day 5 simply says "ring".
 Using the skeleton of the `pluralize_gift()` function, complete the code so that 
 the function takes a gift and returns the appropriate plural. 
 
-```{r}
+```{r echo=TRUE, warning=FALSE}
 # Function that takes a noun and makes it plural
 # Arguments -- gift -- A string or vector of strings
 # Return -- A string or vector of strings with the pluralized words
 
 pluralize_gift <- function(gift){
-
-gift <- gift %>%
-  str_replace()
-
+  for (i in seq_along(gift)){
+  if (str_detect(gift[[i]], "y")) {
+    gift[[i]] <- str_replace(gift[[i]], "y", "ies")
+  } else if (str_detect(gift[[i]], "oo")) {
+    gift[[i]] <- str_replace(gift[[i]], "oo", "ee")
+  } else {
+    gift[[i]] <- str_c(gift[[i]], "s")
+  }
+  }
 return(gift)
-
 }
+
 ```
 
 *Hint 1:* Note that the gifts on days six and nine have unusual pluralizations.
@@ -60,7 +66,7 @@ these types.
 
 *Hint 2:*  The following small example may be useful to you:
 
-```{r, eval = TRUE}
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 my_names <- c("Kimberly", "Trini", "Jason", "Billy", "Zach", "Tommy")
 
 my_names %>% 
@@ -81,7 +87,7 @@ Try your function out on the gifts in the dataset.
 (Consider: is your function *vectorized*?  It does not have to be, but it may
 make things simpler!)
 
-```{r}
+```{r echo=TRUE, warning=FALSE}
 
 pluralize_gift(xmas$Gift.Item)
 
@@ -96,57 +102,44 @@ purrr::map_chr(xmas$Gift.Item, pluralize_gift)
 ## Step Two: Creating sentences
 
 Write a function called `make_phrase` that takes as input the necessary information, 
-and returns a phrase.  For example, 
+and returns a phrase.  
 
-```{r}
-make_phrase(num = 10, 
-            num_word = "ten", 
-            item = "lords", 
-            verb = "a-leaping", 
-            adjective = "", 
-            location = "")
-```
-
-should return
-
-```
-"ten lords a-leaping"
-```
-
-```{r}
+```{r echo=TRUE, warning=FALSE}
 make_phrase <- function(num, num_word, item, verb, adjective, location) {
   
   ## Step 1: Replace NAs with blank strings
   verb <- str_replace_na(verb, "")
+  item <- str_replace_na(item, "")
+  adjective <- str_replace_na(adjective, "")
+  location <- str_replace_na(location, "")
   
   ## Step 2: Pluralize the gift if needed
   ## Items with numbers larger than 1 should be pluralized
   ## Single items starting with a vowel should have "an" in front
   ## All other single items should have "a" in front
   
-  vowel_start <- str_sub(item, 1, 1) %>% str_detect(___)
-  
-  if (___) {
-    
+  vowel_start <- str_sub(item, 1, 1) %>% str_detect("[aeiou]")
+  if (num > 1) {
     item <- pluralize_gift(item)
-    
   } else if (vowel_start) {
-  
-      
-    
+    num_word <- "an"
   } else {
-    
-    
-    
+    num_word <- "a"
   }
-  
   glue::glue("{num_word} {adjective} {item} {verb} {location}") %>%
     str_squish()
-  
-  
 }
+  
 ```
 
+```{r echo=TRUE, warning=FALSE}
+make_phrase(num = 10, 
+            num_word = "ten", 
+            item = "lord", 
+            verb = "a-leaping", 
+            adjective = "", 
+            location = "")
+```
 
 # Test Your Function
 
@@ -157,11 +150,11 @@ the daily phrases.
 to say `"twelve"` **not** `"twelfth"`. I suggest using the **english** package
 to create numbered days and then use those in your `pmap_chr()`!
 
-```{r}
+```{r echo=TRUE, warning=FALSE}
 xmas <- xmas %>%
   mutate(
-    Full.Phrase = pmap_chr(list(___), 
-                           make_phrase)
+    Num.Word = as.character(english::english(Day)),
+    Full.Phrase = pmap_chr(list(Day, Num.Word, Gift.Item, Verb, Adjective, Location), make_phrase)
   )
 ```
 
@@ -179,33 +172,26 @@ Write a function called `sing_line` that takes as input:
 
 * The name of a column in the dataset that contains the phrases for each day.
 
-```{r}
+```{r echo=TRUE, warning=FALSE}
 # Produces the string for one day of the song.
 # Arguments -- dataset -- A data frame containing information about gifts
 # Arguments -- line -- The number of the line for the day you want to sing about
 # Arguments -- phrase_col -- The variable name for the column in the dataset that contains the gift phrases
 # Return -- A string singing the line of the song with all gifts for the given day.
 
-sing_day <- function(dataset, line, phrase_col){
-  
+sing_line <- function(dataset, line, phrase_col){
   # Step 1: Setup the intro line
-  
-  num_word <- ____
-  
-  intro <- glue::glue("On the {num_word} day of Christmas")
-  
+  num_word <- dataset$Day.in.Words[line]
+  intro <- glue::glue("On the {num_word} day of Christmas, my true love sent to me,")
   # Step 2: Sing the gift phrases
-
     phrases <- dataset %>% 
       pull({{phrase_col}})
-
-  ????
-    
+    # From the glue tidyverse page: https://glue.tidyverse.org/reference/glue_collapse.html
+    phrase <- glue_collapse(phrases[line:1], sep = ', ', last = ' and ')
   ## put it together
-    
-  ????
-
-
+  verse <- glue::glue("{intro}
+                      {phrase}")
+  return(verse)
 }
 
 
@@ -214,10 +200,10 @@ sing_day <- function(dataset, line, phrase_col){
 For example,
 
 
-```{r}
+```{r echo=TRUE, warning=FALSE}
 sing_line(xmas, 
-          num = 2, 
-          phrase_col = Full.Phrase)
+          2, 
+          Full.Phrase)
 
 ```
 
@@ -239,7 +225,7 @@ column names as arguments to a function.  Don't delete that line of code!
 Run the following code to test out your functions! The ouput should be the 
 lyrics for the entire 12 Days of Christmas song. 
 
-```{r}
+```{r echo=TRUE, warning=FALSE}
 xmas2 <- xmas %>%
   mutate(
     day.num = as.character(english::english(Day)), 
